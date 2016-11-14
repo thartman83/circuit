@@ -62,42 +62,19 @@ table.reduce = function (tbl, fn) -- {{{
 end
 -- }}}
 
+-- table.map
+table.map = function (tbl, fn) -- {{{
+   local retval = {}
+   for i,v in ipairs(tbl) do
+      retval[i] = fn(v)
+   end   
+   return retval
+end
+-- }}}
+
 -- }}}
 
 --- Methods -- {{{
-
--- Layout a grided layout. Each widget will have the max height and width of
--- its row and column siblings
--- @param context The drawing context
--- @param width The available width
--- @param height The available height
-function grid:layout (context, width, height) -- {{{
-   local retval = {}
-   local pos, spacing = 0, self._private.spacing
-
-   for k, v in pairs(self._private.widgets) do
-      local x, y, w, h
-      
-   end
-   
-   return retval   
-end
--- }}}
-
--- Fit the grided layout into the given space
--- @param context The fit context
--- @param width The available width
--- @param height The available height
-function grid:fit (context, width, height) -- {{{
-   self.rows = {}
-   local col_sum = reduce(self.col_width, function (a,b) return a+b end)
-   
-   for i=1,#cells do
-      row[i] = wibox.layout.fixed.horizontal()
-      row[i]:fit(col_sum, self.row_height[i])
-   end
-end
--- }}}
 
 --- Set the content of of the grided layout
 -- @param content Table of values for each cell in the grid
@@ -106,44 +83,46 @@ function grid:set_content (content) -- {{{
 
    self.nrows = #content   
    self.ncols = 0
-   self.row_width = {}
+   self.row_height = {}
    self.col_width = {}
+
+   self:reset()
    
+   -- Build the widgets and calculate the row heights and col widths
    for i=1, #content do
-      if ncols < #cells[i] then ncols = #cols[i] end         
+      if self.ncols < #content[i] then self.ncols = #content[i] end
       cells[i] = {}
-      self.row_width[i] = 0
+      self.row_height[i] = 0
       
       for j, v in ipairs(content[i]) do         
          cells[i][j] = wibox.widget.textbox()
          cells[i][j]:set_text(content[i][j])
 
+         -- each row height should be the height of the largest cell in the row
+         -- each col width should be the width of the largest cell in the col
          local w, h = cells[i][j]:fit(self.width, self.height)
-         if self.row_width[i] < h then self.row_width[i] = h end
+         if self.row_height[i] < h then self.row_height[i] = h end
          if self.col_width[j] < w then self.col_width[j] = w end
       end
    end
-end
--- }}}
 
--- }}}
+   -- Calculate the proper ratios for each column
+   local sum = table.reduce(self.col_width, function (a,b) return a+b end)
+   local ratios = table.map(self.col_width, function (a) return a/sum end)
 
---- new
-local function new(content, args) -- {{{
-   local args = args or {}
-   local width = args.width or 200
-   
-   for i, v in ipairs(content) do
-      local row = wibox.layout.fixed.horizontal()
-      
-      for i=1, ncols do
-         row:add(wibox.widget.textbox(v))
+   -- Build the row layouts and add them to the vertical layout and set the
+   -- proper widget ratio
+   for i=1,self.nrows do
+      local row_layout = wibox.layout.ratio.horizontal()      
+      for j=1,self.ncols do         
+         row_layout[i]:add(cells[i][j])
+         row_layout[i]:set_ratio(j,ratios[j])
       end
-      _grid:add(row)
+      self:add(row_layout)
    end
-   
-   return _grid
 end
+-- }}}
+
 -- }}}
 
 return grid
