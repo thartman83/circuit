@@ -33,7 +33,7 @@
 
 -- }}}
 
---- grid widget -- {{{
+--- Grid layout -- {{{
 
 --- Locals -- {{{
 local wibox = require("wibox")
@@ -42,8 +42,7 @@ local table = table
 local ipairs = ipairs
 local setmetatable = setmetatable
 
-local grid = wibox.layout.fixed.vertical()
-
+local grid = { mt = {} }
 -- }}}
 
 --- Helper functions -- {{{
@@ -76,6 +75,24 @@ end
 
 --- Methods -- {{{
 
+--- grid:layout
+-- @param width The overall width of the grid layout
+-- @param height The overall height of the grid layout
+function grid:layout (_, width, height) -- {{{
+   
+end
+-- }}}
+
+--- grid:fit
+function grid:fit (context, orig_width, orig_height) -- {{{
+   -- Calculate the max col width and row height
+   for i, v in ipairs(self._private.widgets) do
+      i_x, i_y = ((i - 1) / self._private.ncols) + 1, ((i -1) % self._private.ncols) + 1
+   end
+   
+end
+-- }}}
+
 --- Set the content of of the grided layout
 -- @param content Table of values for each cell in the grid
 function grid:set_content (content) -- {{{
@@ -85,6 +102,10 @@ function grid:set_content (content) -- {{{
    self.ncols = 0
    self.row_height = {}
    self.col_width = {}
+
+   -- Temp variables
+   self.width = 200
+   self.height = 200
 
    self:reset()
    
@@ -102,7 +123,7 @@ function grid:set_content (content) -- {{{
          -- each col width should be the width of the largest cell in the col
          local w, h = cells[i][j]:fit(self.width, self.height)
          if self.row_height[i] < h then self.row_height[i] = h end
-         if self.col_width[j] < w then self.col_width[j] = w end
+         if self.col_width[j] == nil or self.col_width[j] < w then self.col_width[j] = w end
       end
    end
 
@@ -125,5 +146,25 @@ end
 
 -- }}}
 
-return grid
+--- Constructors -- {{{
+
+--- new
+local function new (nrows, ncols, content, args) -- {{{
+   local retval = wibox.layout.fixed.horizontal()
+   
+   util.table.crush(retval, grid, true)
+   
+   return retval
+end
+-- }}}
+
+--- grid.mt:__call
+function grid.mt:__call (_, ...) -- {{{
+   return new(...)   
+end
+-- }}}
+
+-- }}}
+
+return setmetatable(grid, grid.mt)
 -- }}}

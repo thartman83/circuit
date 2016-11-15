@@ -20,7 +20,5 @@
 -- }}}
 
 -- init circuit -- {{{
-local circuit = { grid = require('grid'), }
-
-return circuit
+return { grid = require('circuit.grid'), }
 --
