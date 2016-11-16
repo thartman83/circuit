@@ -39,11 +39,13 @@
 local wibox = require("wibox")
 local base = require("wibox.widget.base")
 local beautiful = require("beautiful")
+local util = require("awful.util")
+
 local table = table
 local ipairs = ipairs
 local setmetatable = setmetatable
 
-local grid = { mt = {} }
+local grid = { }
 -- }}}
 
 --- Helper functions -- {{{
@@ -69,6 +71,26 @@ table.map = function (tbl, fn) -- {{{
       retval[i] = fn(v)
    end   
    return retval
+end
+
+
+--- Override elements in the first table by the one in the second
+
+-- This function is defined in the current dev branch of awesome but I need it
+-- now.
+util.table.crush = function (t, set, raw)
+    if raw then
+       for k, v in pairs(set) do
+          print("Setting " .. k .. "...")
+          rawset(t, k, v)
+       end
+    else
+       for k, v in pairs(set) do
+          t[k] = v
+       end
+    end
+    
+    return t
 end
 -- }}}
 
@@ -143,43 +165,57 @@ end
 
 --- Constructors -- {{{
 
---- new
-local function new (nrows, ncols, content, args) -- {{{
-   local retval = wibox.layout.fixed.horizontal()
-   
-   util.table.crush(retval, grid, true)
-
+--- init
+function grid:init (nrows, ncols, content, args) -- {{{
    -- if the number of rows and columns is specificed and greater than 0
    -- set them here, otherwise default them to 1
    if nrows and nrows > 0 then
-      retval._private.nrows = nrows
+      self._private.nrows = nrows 
    else
-      retval._private.nrows = 1
+      self._private.nrows = 1
    end
 
    if ncols and ncols > 0 then
-      retval._private.ncols = ncols
+      self._private.ncols = ncols
    else
-      retval._private.ncols = 1
+      self._private.ncols = 1
    end
+
+   self._private.row_heights = {}
+   self._private.col_widths = {}
 
    -- Add the content if specified so long as the content has (ncols * nrows)
    -- length or fewer
    if content and #content <= (ncols * nrows) then
-      retval:set_content(content)
+      self:set_content(content)
    end
+end
+-- }}}
+
+--- new
+function grid.new (nrows, ncols, content, args) -- {{{
+   local retval = wibox.layout.fixed.horizontal()   
+
+--   util.table.crush(retval, grid, true)
+   for k, v in pairs(grid) do
+      if type(v) == "function" then
+         retval[k] = v
+      end
+   end
+   
+   retval:init(nrows,ncols, content, args)
    
    return retval
 end
 -- }}}
 
 --- grid.mt:__call
-function grid.mt:__call (_, ...) -- {{{
-   return new(...)   
-end
+--function grid:__call (_, ...) -- {{{
+--   return new(...)   
+--end
 -- }}}
 
 -- }}}
 
-return setmetatable(grid, grid.mt)
+return grid
 -- }}}
