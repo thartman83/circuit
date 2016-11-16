@@ -37,6 +37,7 @@
 
 --- Locals -- {{{
 local wibox = require("wibox")
+local base = require("wibox.widget.base")
 local beautiful = require("beautiful")
 local table = table
 local ipairs = ipairs
@@ -79,67 +80,61 @@ end
 -- @param width The overall width of the grid layout
 -- @param height The overall height of the grid layout
 function grid:layout (_, width, height) -- {{{
-   
+   local retval = {}
+   local spacing = self._private.spacing
+   local x, y, w, h = 0,0,0,0
+
+   for i,v in pairs(self._private.widegts) do      
+      local i_x = ((i - 1) % self._private.ncols) + 1
+      local i_y = math.floor((i - 1) / self._private.ncols) + 1
+
+      w = self._private.col_width[i_x]
+      h = self._private.row_height[i_y]
+
+      table.insert(retval, base.place_widget_at(v, x, y, w, h))
+
+      -- last item in the row, reset y and increment x by row height
+      if i_y == self._private.ncols then
+         x = 0
+         y = y + self._private.row_heights[i_y]
+      else -- increment y by col width
+         x = x + self._private.col_widths[i_x]
+      end
+   end   
+
+   return retval
 end
 -- }}}
 
 --- grid:fit
 function grid:fit (context, orig_width, orig_height) -- {{{
    -- Calculate the max col width and row height
-   for i, v in ipairs(self._private.widgets) do
-      i_x, i_y = ((i - 1) / self._private.ncols) + 1, ((i -1) % self._private.ncols) + 1
-   end
+   local row_heights, col_widths = {},{}
+   for i=1,self._private.nrows do row_heights[i] = 0 end
+   for i=1,self._private.ncols do col_widths[i] = 0 end
    
+   for i, v in ipairs(self._private.widgets) do
+      local i_x = ((i - 1) % self._private.ncols) + 1
+      local i_y = math.floor((i - 1) / self._private.ncols) + 1
+      
+      local w,h = base.fit_widget(self, context, v, orig_width, orig_height)
+      row_heights[i_x] = math.max(row_heights[i_x], w)
+      col_widths[i_y] = math.max(col_widths[i_y], h)
+   end
+
+   self._private.row_heights = row_heights
+   self._private.col_widths = col_widths
+
+   return table.reduce(col_widths, function (a,b) return a+b end),
+          table.reduce(row_height, function (a,b) return a+b end)   
 end
 -- }}}
 
 --- Set the content of of the grided layout
 -- @param content Table of values for each cell in the grid
 function grid:set_content (content) -- {{{
-   local cells = {}
-
-   self.nrows = #content   
-   self.ncols = 0
-   self.row_height = {}
-   self.col_width = {}
-
-   -- Temp variables
-   self.width = 200
-   self.height = 200
-
-   self:reset()
-   
-   -- Build the widgets and calculate the row heights and col widths
-   for i=1, #content do
-      if self.ncols < #content[i] then self.ncols = #content[i] end
-      cells[i] = {}
-      self.row_height[i] = 0
-      
-      for j, v in ipairs(content[i]) do         
-         cells[i][j] = wibox.widget.textbox()
-         cells[i][j]:set_text(content[i][j])
-
-         -- each row height should be the height of the largest cell in the row
-         -- each col width should be the width of the largest cell in the col
-         local w, h = cells[i][j]:fit(self.width, self.height)
-         if self.row_height[i] < h then self.row_height[i] = h end
-         if self.col_width[j] == nil or self.col_width[j] < w then self.col_width[j] = w end
-      end
-   end
-
-   -- Calculate the proper ratios for each column
-   local sum = table.reduce(self.col_width, function (a,b) return a+b end)
-   local ratios = table.map(self.col_width, function (a) return a/sum end)
-
-   -- Build the row layouts and add them to the vertical layout and set the
-   -- proper widget ratio
-   for i=1,self.nrows do
-      local row_layout = wibox.layout.ratio.horizontal()      
-      for j=1,self.ncols do         
-         row_layout[i]:add(cells[i][j])
-         row_layout[i]:set_ratio(j,ratios[j])
-      end
-      self:add(row_layout)
+   for _, v in ipairs(content) do
+      self:add(wibox.widgets.textbox(v))
    end
 end
 -- }}}
@@ -153,6 +148,26 @@ local function new (nrows, ncols, content, args) -- {{{
    local retval = wibox.layout.fixed.horizontal()
    
    util.table.crush(retval, grid, true)
+
+   -- if the number of rows and columns is specificed and greater than 0
+   -- set them here, otherwise default them to 1
+   if nrows and nrows > 0 then
+      retval._private.nrows = nrows
+   else
+      retval._private.nrows = 1
+   end
+
+   if ncols and ncols > 0 then
+      retval._private.ncols = ncols
+   else
+      retval._private.ncols = 1
+   end
+
+   -- Add the content if specified so long as the content has (ncols * nrows)
+   -- length or fewer
+   if content and #content <= (ncols * nrows) then
+      retval:set_content(content)
+   end
    
    return retval
 end
